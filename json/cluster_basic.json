@@ -1,0 +1,17 @@
+{
+    "name": "f9s-spark-api",
+    "plugin_name": "spark",
+    "hadoop_version": "1.0.0",
+    "node_groups": [
+        {
+            "name": "master",
+            "node_group_template_id": "5da028a7-79a2-48bb-afa3-f73bb34f3834",
+            "count": 1
+        },
+        {
+            "name": "workers",
+            "node_group_template_id": "f7a80d1e-1cb0-4cac-9d89-14fafaebc989",
+            "count": 1
+        }
+    ]
+}
