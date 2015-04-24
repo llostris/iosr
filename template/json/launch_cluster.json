@@ -1,0 +1,9 @@
+{
+    "name": "f9s-spark-api-ms",
+    "plugin_name": "spark",
+    "hadoop_version": "1.0.0",
+    "cluster_template_id" : "CLUSTER_TEMPLATE_ID",
+    "user_keypair_id": "js",
+    "default_image_id": "c113756d-05ec-4015-9054-2c1f1f29f182",
+    "neutron_management_network": "9b4a2190-9b4c-4d29-a3c2-dcf255cc1975"
+}

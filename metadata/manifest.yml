@@ -1,0 +1,22 @@
+Name: spark
+Cartridge-Short-Name: SPARK
+Cartridge-Version: 0.0.1
+Cartridge-Vendor: aghiosr
+Source-Url: https://bitbucket.org/llostris/iosr-cartrige.git
+Display-Name: Spark Cartridge
+Description: "Empty cartridge"
+Version: '1.0.0'
+Vendor: 'Apache'
+Categories:
+  - service
+Provides:
+  - spark
+Endpoints:
+  - Private-IP-Name:   IP
+    Private-Port-Name: PORT
+    Private-Port:      8080
+    Public-Port-Name:  PROXY_PORT
+    Mappings:
+      - Frontend:      ""
+        Backend:       ""
+        Options:       { websocket: false }

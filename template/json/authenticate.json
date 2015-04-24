@@ -1,0 +1,9 @@
+{
+	"auth": {
+		"tenantName" : "student", 
+		"passwordCredentials": {
+			"username": "student", 
+			"password": "student123"
+		}
+	}
+}

@@ -1,0 +1,8 @@
+#!/bin/bash -eu
+
+# client_message "Emptying cartridge directory"
+# rm -rf $OPENSHIFT_SPARK_DIR/*
+
+# delete clusters
+
+exit 0

@@ -1,0 +1,29 @@
+#!/bin/bash -eu
+
+function start {
+  echo "cartridge started"
+}
+
+function stop {
+  echo "cartridge"
+}
+
+function catchall {
+    echo "not yet implemented"
+}
+
+case "$1" in
+  start)       start ;;
+  stop)        stop ;;
+  restart)     catchall ;;
+  status)      catchall ;;
+  reload)      catchall ;;
+  tidy)        catchall ;;
+  pre-build)   catchall ;;
+  build)       catchall ;;
+  deploy)      catchall ;;
+  post-deploy) catchall ;;
+  *)           exit 0
+esac
+
+exit 0

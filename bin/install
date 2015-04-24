@@ -1,0 +1,70 @@
+#!/bin/bash
+
+source $OPENSHIFT_CARTRIDGE_SDK_BASH
+
+client_message "SMG App name: $OPENSHIFT_APP_NAME"
+client_message "Openstack Auth url: $OPENSTACK_AUTH_URL"
+client_message "Openstack url: $OPENSTACK_URL"
+client_message "Logfile: $OPENSHIFT_SPARK_LOG"
+echo -e `ls >> $OPENSHIFT_LOG_DIR/$OPENSHIFT_GEAR_NAME.log `
+
+mkdir "$OPENSHIFT_SPARK_DIR"/temp
+
+# authentiacation
+client_message "Your token is: $OPENSTACK_TOKEN"
+curl -s -X POST "$OPENSTACK_AUTH_URL"/tokens \
+		-H  "Content-Type: application/json" \
+		-d @"$OPENSHIFT_SPARK_DIR"/template/json/authenticate.json >> "$OPENSHIFT_SPARK_DIR"/temp/response_authenticate.json
+
+# parse response and save token to appropriate variable
+echo -e `cat $OPENSHIFT_SPARK_DIR/temp/response_athenticate.json >> $OPENSHIFT_LOG_DIR/$OPENSHIFT_GEAR_NAME.log `
+TOKEN=`cat $OPENSHIFT_SPARK_DIR/temp/response_authenticate.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.access.token.id'`
+client_message "Your token is: $TOKEN"
+# echo $OPENSTACK_TOKEN > $OPENSTACK_SPARK_DIR/env/OPENSTACK_TOKEN
+
+# # create master node group template
+# curl -s -X POST http://172.17.84.1:8386/v1.1/a23877e215ac496b8d4c06806cc30e00/node-group-templates \
+# 		-H "Content-Type: application/json" \
+# 		-H "X-Auth-Token: $TOKEN" \ 
+# 		-d @"$OPENSHIFT_SPARK_DIR"/template/json/ng-master.json \
+# 		>> "$OPENSHIFT_SPARK_DIR"/temp/resonse_ng-master.json
+
+# OPENSHIFT_SPARK_NTEMPLATE_MASTER_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_ng-master.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.node_group_template.id'`
+
+# # create slave node group template
+# curl -s -X POST http://172.17.84.1:8386/v1.1/a23877e215ac496b8d4c06806cc30e00/node-group-templates \
+# 		-H "Content-Type: application/json" \
+# 		-H "X-Auth-Token: $TOKEN" \
+# 		-d @"$OPENSHIFT_SPARK_DIR"/template/json/ng-slave.json \
+# 		>> "$OPENSHIFT_SPARK_DIR"/response_temp/ng-slave.json
+
+# OPENSHIFT_SPARK_NTEMPLATE_SLAVE_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_ng-slave.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.node_group_template.id'`
+
+# sed -e "s/NTEMPLATE_MASTER_ID/$OPENSIFT_SPARK_NTEMPLATE_MASTER_ID/g" \ 
+# 	-e "s/NTEMPLATE_SLAVE_ID/$OPENSHIFT_SPARK_NTEMPLATE_SLAVE_ID/g" \ 
+# 	"$OPENSHIFT_SPARK_DIR"/template/json/cluster_basic.json >> "$OPENSHIFT_SPARK_DIR"/temp/cluster_basic_resolved.json
+
+# # create cluster template
+# curl -s -X POST http://172.17.84.1:8386/v1.1/a23877e215ac496b8d4c06806cc30e00/cluster-templates \
+# 		-H "Content-Type: application/json" \
+# 		-H "X-Auth-Token: $TOKEN" \
+# 		-d @"$OPENSHIFT_SPARK_DIR"/temp/cluster_basic_resolved.json \
+# 		>> "$OPENSHIFT_SPARK_DIR"/temp/response_cluster_basic.json
+
+# OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_cluster_basic.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.cluster_template.id'`
+
+# sed -e "s/CLUSTER_TEMPLATE_ID/$OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID/g" \
+# 	"$OPENSHIFT_SPARK_DIR"/template/json/launch_cluster.json >> "$OPENSHIFT_SPARK_DIR"/temp/launch_cluster_resolved.json
+
+# # create cluster
+# curl -s -X POST http://172.17.84.1:8386/v1.1/a23877e215ac496b8d4c06806cc30e00/clusters \
+# 		-H "Content-Type: application/json" \
+# 		-H "X-Auth-Token: $TOKEN"
+# 		-d @"$OPENSHIFT_SPARK_DIR"/temp/launch_cluster_resolved.json \
+# 		>> "$OPENSHIFT_SPARK_DIR"/temp/response_launch_cluster.json
+
+
+# cleanup
+# rm -rf "$OPENSHIFT_SPARK_DIR"/temp/*
+
+exit 0
