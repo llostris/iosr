@@ -5,7 +5,7 @@ function start {
 }
 
 function stop {
-  echo "cartridge"
+  echo "cartridge stopped"
 }
 
 function catchall {
