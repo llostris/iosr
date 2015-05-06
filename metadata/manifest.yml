@@ -2,7 +2,7 @@ Name: spark
 Cartridge-Short-Name: SPARK
 Cartridge-Version: 0.0.1
 Cartridge-Vendor: aghiosr
-Source-Url: https://bitbucket.org/llostris/iosr-cartrige.git
+Source-Url: https://github.com/llostris/iosr/archive/cartridge.zip
 Display-Name: Spark Cartridge
 Description: "Empty cartridge"
 Version: '1.0.0'
