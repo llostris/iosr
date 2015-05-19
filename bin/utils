@@ -1,0 +1,71 @@
+#!/bin/bash -eu
+
+source $OPENSHIFT_CARTRIDGE_SDK_BASH
+
+function getLogTimeStamp {
+  echo "$(date +"%y-%m-%d %H:%M:%S")"
+}
+
+function authenticate {
+  curl -s -X POST "$OPENSTACK_AUTH_URL/tokens" \
+      -H "Content-Type: application/json" \
+      -d @"$OPENSHIFT_SPARK_DIR"/template/json/authenticate.json \
+      > "$OPENSHIFT_SPARK_DIR"/temp/response_authenticate.json
+
+  # parse response and save token to appropriate environmental variable
+  OPENSTACK_TOKEN=`cat $OPENSHIFT_SPARK_DIR/temp/response_authenticate.json | $OPENSHIFT_SPARK_JQ -r '.access.token.id'`
+  echo $OPENSTACK_TOKEN > $OPENSHIFT_SPARK_DIR/env/OPENSTACK_TOKEN
+  echo "$OPENSTACK_TOKEN"
+}
+
+function createCluster {
+  client_message "Creating Spark clusters on OpenStack..."
+
+  rm -rf "$OPENSHIFT_SPARK_DIR"/temp
+  mkdir "$OPENSHIFT_SPARK_DIR"/temp
+
+  timestamp="$(date +"%m%d%H%M%S")"
+
+  TOKEN=$(authenticate)
+  client_message "Your token is: $TOKEN"
+
+  # hardcoded for the time being
+  OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID="65c9d312-f0ed-4853-a268-0be956ce239e"  
+
+  sed -e "s/{UUID}/$OPENSHIFT_APP_UUID/g" \
+    -e "s/{TIMESTAMP}/$timestamp/g" \
+    -e "s/{CLUSTER_TEMPLATE_ID}/$OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID/g" \
+    "$OPENSHIFT_SPARK_DIR"/template/json/launch_cluster.json > "$OPENSHIFT_SPARK_DIR"/temp/launch_cluster_resolved.json
+
+  curl -s -X POST "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/clusters" \
+      -H "Content-Type: application/json" \
+      -H "X-Auth-Token: $TOKEN" \
+      -d @"$OPENSHIFT_SPARK_DIR"/temp/launch_cluster_resolved.json \
+      > "$OPENSHIFT_SPARK_DIR"/temp/response_launch_cluster.json
+
+  ERROR=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.error_name?'`
+
+  # TODO: add error handling
+
+  OPENSHIFT_SPARK_CLUSTER_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.cluster.id'`
+  OPENSHIFT_SPARK_MANAGEMENT_KEY=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.cluster.management_public_key'`
+
+  echo "Cluster id: $OPENSHIFT_SPARK_CLUSTER_ID" >> $OPENSHIFT_SPARK_LOG
+
+  echo $OPENSHIFT_SPARK_CLUSTER_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_CLUSTER_ID
+  echo $OPENSHIFT_SPARK_MANAGEMENT_KEY > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_MANAGEMENT_KEY
+}
+
+function stopCluster {
+  OPENSTACK_TOKEN=$(authenticate)
+  client_message "STOP: your token is: $OPENSTACK_TOKEN"
+  
+  curl -s -X DELETE "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/clusters/${OPENSHIFT_SPARK_CLUSTER_ID}" \
+    -H "Content-Type: application/json" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" > temp/response_stop_cluster.json
+}
+
+function checkClusterStatus {
+  # TODO
+  echo 0
+}

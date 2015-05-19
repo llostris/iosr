@@ -1,6 +1,10 @@
 ---
 locked_files:
-- env/
-- env/*
+- env/OPENSHIFT_SPARK_LOG
+- env/OPENSHIFT_SPARK_JQ
+- metadata/
+- metadata/*
+- bin
+- bin/*
 processed_templates:
 - '**/*.erb'
