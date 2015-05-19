@@ -15,6 +15,7 @@ function authenticate {
   # parse response and save token to appropriate environmental variable
   OPENSTACK_TOKEN=`cat $OPENSHIFT_SPARK_DIR/temp/response_authenticate.json | $OPENSHIFT_SPARK_JQ -r '.access.token.id'`
   echo $OPENSTACK_TOKEN > $OPENSHIFT_SPARK_DIR/env/OPENSTACK_TOKEN
+  echo "Your token is $OPENSTACK_TOKEN" >> $OPENSHIFT_SPARK_LOG
   echo "$OPENSTACK_TOKEN"
 }
 
@@ -47,8 +48,8 @@ function createCluster {
 
   # TODO: add error handling
 
-  OPENSHIFT_SPARK_CLUSTER_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.cluster.id'`
-  OPENSHIFT_SPARK_MANAGEMENT_KEY=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_DIR/bin/util/jq -r '.cluster.management_public_key'`
+  OPENSHIFT_SPARK_CLUSTER_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.cluster.id'`
+  OPENSHIFT_SPARK_MANAGEMENT_KEY=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.cluster.management_public_key'`
 
   echo "Cluster id: $OPENSHIFT_SPARK_CLUSTER_ID" >> $OPENSHIFT_SPARK_LOG
 
