@@ -3,43 +3,58 @@
 source $OPENSHIFT_CARTRIDGE_SDK_BASH
 source $OPENSHIFT_SPARK_DIR/bin/utils
 
-echo $(getLogTimeStamp) ": spark-cartridge control.sh - $1" >> $OPENSHIFT_SPARK_LOG
+echo $(getLogTimeStamp) "spark-cartridge control.sh - $1" >> $OPENSHIFT_SPARK_LOG
 
 function start {
-  echo $(getLogTimeStamp) ": cartridge: start" >> $OPENSHIFT_SPARK_LOG
+  echo $(getLogTimeStamp) "spark-cartridge: start" >> $OPENSHIFT_SPARK_LOG
 
   createCluster
+
+  createJobBinaryInternal
+
+  createJobBinary
+
+  createJob
+
 }
 
 function stop {
-  echo $(getLogTimeStamp) ": cartridge: stop" >> $OPENSHIFT_SPARK_LOG
+  echo $(getLogTimeStamp) "spark-cartridge: stop" >> $OPENSHIFT_SPARK_LOG
 
   stopCluster
+
+  # TODO: move to TIDY
+
+  deleteJob
+
+  deleteJobBinary
+
+  deleteJobBinaryInternal
 
 }
 
 function restart {
   stop
   start
-  echo $(getLogTimeStamp) ": restart" >> $OPENSHIFT_SPARK_LOG
+  echo $(getLogTimeStamp) "spark-cartridge: restart" >> $OPENSHIFT_SPARK_LOG
 
 }
 
 function status {
-  echo $(getLogTimeStamp) ": status" >> $OPENSHIFT_SPARK_LOG
+  echo $(getLogTimeStamp) "spark-cartridge: status" >> $OPENSHIFT_SPARK_LOG
 }
 
 function reload {
-  echo $(getLogTimeStamp) ": reload" >> $OPENSHIFT_SPARK_LOG
+  echo $(getLogTimeStamp) "spark-cartridge: reload" >> $OPENSHIFT_SPARK_LOG
   client_result "Reloading Spark Cartridge"
 }
 
 function tidy {
-  echo $(getLogTimeStamp) ": tidy" >> $OPENSHIFT_SPARK_LOG
+  echo $(getLogTimeStamp) "spark-cartridge: tidy" >> $OPENSHIFT_SPARK_LOG
 }
 
 function catchall {
-    echo $(getLogTimeStamp) ": not yet implemented" >> $OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "spark-cartridge: not yet implemented" >> $OPENSHIFT_SPARK_LOG
 }
 
 case "$1" in

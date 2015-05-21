@@ -1,0 +1,4 @@
+{
+    "url": "internal-db://{JOB_BINARY_INTERNAL_ID}",
+    "name": "{BINARY_NAME}"
+}

@@ -1,0 +1,5 @@
+{
+	"name": "{NAME}-{TIMESTAMP}",
+	"type": "Spark",
+	"mains": ["{JOB_BINARY_ID}"]
+}

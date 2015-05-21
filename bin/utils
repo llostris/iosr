@@ -3,7 +3,7 @@
 source $OPENSHIFT_CARTRIDGE_SDK_BASH
 
 function getLogTimeStamp {
-  echo "$(date +"%y-%m-%d %H:%M:%S")"
+  echo "$(date +"%y-%m-%d %H:%M:%S") : "
 }
 
 function authenticate {
@@ -18,6 +18,9 @@ function authenticate {
   echo "Your token is $OPENSTACK_TOKEN" >> $OPENSHIFT_SPARK_LOG
   echo "$OPENSTACK_TOKEN"
 }
+
+# cluster management
+# ========================
 
 function createCluster {
   client_message "Creating Spark clusters on OpenStack..."
@@ -63,10 +66,200 @@ function stopCluster {
   
   curl -s -X DELETE "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/clusters/${OPENSHIFT_SPARK_CLUSTER_ID}" \
     -H "Content-Type: application/json" \
-    -H "X-Auth-Token: $OPENSTACK_TOKEN" > temp/response_stop_cluster.json
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -o /dev/null -i -w "%{http_code}" > "$OPENSHIFT_SPARK_DIR"/temp/response_stop_cluster.json
+
+  RESPONSE_CODE=`cat $OPENSHIFT_SPARK_DIR/temp/response_stop_cluster.json`
+
+  if [ $RESPONSE_CODE -eq 204 ]
+  then
+    echo $(getLogTimeStamp) "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully." >> OPENSHIFT_SPARK_LOG
+    client_message "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully."
+  else
+    echo $(getLogTimeStamp) "Error terminating ${OPENSHIFT_SPARK_CLUSTER_ID} cluster." >> OPENSHIFT_SPARK_LOG
+  fi
 }
 
 function checkClusterStatus {
   # TODO
   echo 0
+}
+
+# create job
+# ========================
+
+function createJobBinaryInternal {
+  OPENSTACK_TOKEN=$(authenticate)
+  client_message "createJobBinary: your token is: $OPENSTACK_TOKEN"
+
+  # hardcoded for the time being
+  OPENSHIFT_SPARK_BINARY_NAME="wordcount.scala"
+  OPENSHIFT_SPARK_BINARY_PATH="$OPENSHIFT_SPARK_DIR/template/wordcount.scala"
+
+  curl -s -X PUT "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/job-binary-internals/$OPENSHIFT_SPARK_BINARY_NAME" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -d @"$OPENSHIFT_SPARK_BINARY_PATH" \
+    > "$OPENSHIFT_SPARK_DIR"/temp/response_job_binary_internal.json
+
+  ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_job_binary_internal.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
+
+  if [ "$ERROR_MSG" == 'null' ]
+  then
+    OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_job_binary_internal.json | $OPENSHIFT_SPARK_JQ -r '.job_binary_internal.id'`
+    echo $OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID
+    
+    echo $(getLogTimeStamp) "Created job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} successfully." >> $OPENSHIFT_SPARK_LOG
+    client_message "Created job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} successfully."
+  else
+    echo $(getLogTimeStamp) "Error occurred during job binary internal creation: $ERROR_MSG" >> $OPENSHIFT_SPARK_LOG
+  fi
+}
+
+function createJobBinary {
+  OPENSTACK_TOKEN=$(authenticate)
+  client_message "createJobBinary: your token is: $OPENSTACK_TOKEN"
+
+  timestamp="$(date +"%m%d%H%M%S")"
+  BINARY_NAME="spark-cartridge-test"  # TODO: replace
+
+  sed -e "s/{JOB_BINARY_INTERNAL_ID}/$OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID/g" \
+    -e "s/{TIMESTAMP}/$timestamp/g" \
+    -e "s/{BINARY_NAME}/$BINARY_NAME/g" \
+    "$OPENSHIFT_SPARK_DIR"/template/json/job_binary.json > "$OPENSHIFT_SPARK_DIR"/temp/job_binary_resolved.json
+
+  curl -s -X POST "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/job-binaries" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d @"$OPENSHIFT_SPARK_DIR/temp/job_binary_resolved.json" \
+    > "$OPENSHIFT_SPARK_DIR"/temp/response_job_binary.json
+
+  ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_job_binary.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
+
+  if [ "$ERROR_MSG" == 'null' ]
+  then
+    OPENSHIFT_SPARK_JOB_BINARY_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_job_binary.json | $OPENSHIFT_SPARK_JQ -r '.job_binary.id'`
+    echo $OPENSHIFT_SPARK_JOB_BINARY_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_JOB_BINARY_ID
+    
+    echo $(getLogTimeStamp) "Created job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} successfully." >> $OPENSHIFT_SPARK_LOG
+    client_message "Created job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} successfully."
+  else
+    echo $(getLogTimeStamp) "Error occurred during job binary creation: $ERROR_MSG" >> $OPENSHIFT_SPARK_LOG
+  fi
+}
+
+function createJob {
+  OPENSTACK_TOKEN=$(authenticate)
+  client_message "createJob: your token is: $OPENSTACK_TOKEN"
+
+  timestamp="$(date +"%Y%m%d%H%M%S")"
+
+  sed -e "s/{NAME}/$OPENSHIFT_APP_NAME/g" \
+    -e "s/{TIMESTAMP}/$timestamp/g" \
+    -e "s/{JOB_BINARY_ID}/$OPENSHIFT_SPARK_JOB_BINARY_ID/g" \
+    "$OPENSHIFT_SPARK_DIR"/template/json/job.json > "$OPENSHIFT_SPARK_DIR"/temp/job_resolved.json
+
+  curl -s -X POST "${OPENSTACK_SAHARA_URL}/${OPENSTACK_TENANT_ID}/jobs" \
+    -H "Content-Type: application/json" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -d @"$OPENSHIFT_SPARK_DIR"/temp/job_resolved.json \
+    > "$OPENSHIFT_SPARK_DIR"/temp/response_job.json
+  
+  ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_job.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
+
+  if [ "$ERROR_MSG" == 'null' ]
+  then
+    OPENSHIFT_SPARK_JOB_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_job.json | $OPENSHIFT_SPARK_JQ -r '.job.id'`
+    echo $OPENSHIFT_SPARK_JOB_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_JOB_ID
+    
+    echo "Created job with id: ${OPENSHIFT_SPARK_JOB_ID}" >> $OPENSHIFT_SPARK_LOG
+    client_message "Created job with id: ${OPENSHIFT_SPARK_JOB_ID} successfully."
+  else
+    echo $(getLogTimeStamp) "Error occurred during job creation: $ERROR_MSG" >> $OPENSHIFT_SPARK_LOG
+  fi
+
+  # echo $OPENSHIFT_SPARK_JOB_ID
+}
+
+function executeJob {
+  OPENSTACK_TOKEN=$(authenticate)
+  client_message "executeJob: your token is: $OPENSTACK_TOKEN"
+
+  curl -s -X POST "${OPENSTACK_SAHARA_URL}/${OPENSTACK_TENANT_ID}/jobs/${OPENSHIFT_SPARK_JOB_ID}" \
+    -H "Content-Type: application/json" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -d @"$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json \
+    > "$OPENSHIFT_SPARK_DIR"/temp/response_execute_job.json
+
+  JOB_STATUS=`cat $OPENSHIFT_SPARK_DIR/temp/response_execute_job.json | $OPENSHIFT_SPARK_JQ -r '.job_execution.info.status'`
+  
+  OPENSHIFT_SPARK_JOB_EXECUTION_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_execute_job.json | $OPENSHIFT_SPARK_JQ -r '.job_execution.id'`
+  echo $OPENSHIFT_SPARK_JOB_EXECUTION_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_JOB_EXECUTION_ID
+  
+  echo "Job execution id: ${OPENSHIFT_SPARK_JOB_EXECUTION_ID}" >> $OPENSHIFT_SPARK_LOG
+  echo "Job status is ${JOB_STATUS}" >> OPENSHIFT_SPARK_LOG
+  client_message "Started job with id=${OPENSHIFT_SPARK_JOB_EXECUTION_ID}. Current job status is ${JOB_STATUS}."
+
+  echo 0
+}
+
+# delete job
+# ========================
+
+function deleteJobBinaryInternal {
+  OPENSTACK_TOKEN=$(authenticate)  
+  client_message "deleteJobBinaryInternal: your token is: $OPENSTACK_TOKEN"
+
+  curl -s -X DELETE "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/job-binary-internals/${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID}" \
+    -H "Content-Type: application/json" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -o /dev/null -i -w "%{http_code}" > "$OPENSHIFT_SPARK_DIR"/temp/response_delete_job_binary_internal.json
+
+  RESPONSE_CODE=`cat $OPENSHIFT_SPARK_DIR/temp/response_delete_job_binary_internal.json`
+
+  if [ $RESPONSE_CODE -eq 204 ]
+  then
+    echo $(getLogTimeStamp) "Job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    client_message "Job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} deleted successfully."
+  else
+    echo $(getLogTimeStamp) "Error deleting job binary internal with id: $${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID}." >> OPENSHIFT_SPARK_LOG
+  fi
+}
+
+function deleteJobBinary {
+  OPENSTACK_TOKEN=$(authenticate)  
+  client_message "deleteJobBinary: your token is: $OPENSTACK_TOKEN"
+
+  curl -s -X DELETE "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/job-binaries/${OPENSHIFT_SPARK_JOB_BINARY_ID}" \
+    -H "Content-Type: application/json" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -o /dev/null -i -w "%{http_code}" > "$OPENSHIFT_SPARK_DIR"/temp/response_delete_job_binary.json
+
+  RESPONSE_CODE=`cat $OPENSHIFT_SPARK_DIR/temp/response_delete_job_binary.json`
+
+  if [ $RESPONSE_CODE -eq 204 ]
+  then
+    echo $(getLogTimeStamp) "Job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    client_message "Job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} deleted successfully."
+  else
+    echo $(getLogTimeStamp) "Error deleting job binary with id: $${OPENSHIFT_SPARK_JOB_BINARY_ID}." >> OPENSHIFT_SPARK_LOG
+  fi
+}
+
+function deleteJob {
+  OPENSTACK_TOKEN=$(authenticate)  
+  client_message "deleteJob: your token is: $OPENSTACK_TOKEN"
+
+  curl -s -X DELETE "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/jobs/${OPENSHIFT_SPARK_JOB_ID}" \
+    -H "X-Auth-Token: $OPENSTACK_TOKEN" \
+    -o /dev/null -i -w "%{http_code}" > "$OPENSHIFT_SPARK_DIR"/temp/response_delete_job.json
+
+  RESPONSE_CODE=`cat $OPENSHIFT_SPARK_DIR/temp/response_delete_job.json`
+
+  if [ $RESPONSE_CODE -eq 204 ]
+  then
+    echo $(getLogTimeStamp) "Job with id: ${OPENSHIFT_SPARK_JOB_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    client_message "Job with id: ${OPENSHIFT_SPARK_JOB_ID} deleted successfully."
+  else
+    echo $(getLogTimeStamp) "Error deleting job with id: ${OPENSHIFT_SPARK_JOB_ID}." >> OPENSHIFT_SPARK_LOG
+  fi
 }
