@@ -127,7 +127,7 @@ function createJobBinary {
   client_message "createJobBinary: your token is: $OPENSTACK_TOKEN"
 
   timestamp="$(date +"%m%d%H%M%S")"
-  BINARY_NAME="f9s-${UUID}-${timestamp}"  # TODO: replace
+  BINARY_NAME="f9s-${OPENSHIFT_APP_UUID}-${timestamp}"  # TODO: replace
 
   sed -e "s/{JOB_BINARY_INTERNAL_ID}/$OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID/g" \
     -e "s/{TIMESTAMP}/$timestamp/g" \
