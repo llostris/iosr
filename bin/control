@@ -16,6 +16,8 @@ function start {
 
   createJob
 
+  executeJob
+
 }
 
 function stop {
@@ -24,6 +26,8 @@ function stop {
   stopCluster
 
   # TODO: move to TIDY
+
+  deleteJobExecution
 
   deleteJob
 
