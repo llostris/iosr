@@ -1,47 +1,70 @@
-#!/bin/bash -eu
+#!/bin/bash -e
 
 source $OPENSHIFT_CARTRIDGE_SDK_BASH
 source $OPENSHIFT_SPARK_DIR/bin/utils
+source $OPENSHIFT_SPARK_DIR/bin/manifest_parser
 
 echo $(getLogTimeStamp) "spark-cartridge control.sh - $1" >> $OPENSHIFT_SPARK_LOG
 
 function start {
   echo $(getLogTimeStamp) "spark-cartridge: start" >> $OPENSHIFT_SPARK_LOG
 
-  createCluster
+  if [ $(isAppWithManifest) -eq 0 ]
+  then
+    client_message "Located manifest file, proceeding with cluster creation."
+  
+    parse_manifest
 
-  createJobBinaryInternal
+    client_message "Parsed manifest file successfully."
 
-  createJobBinary
+    createCluster
 
-  createJob
-
-  executeJob
-
+    if [ -n "$OPENSHIFT_SPARK_CLUSTER_ID" ]
+    then
+      createJobBinaryInternal
+      createJobBinary
+      createJob
+      executeJob
+    fi
+  else
+    client_message "No manifest found, halting cluster creation."
+  fi
 }
 
 function stop {
   echo $(getLogTimeStamp) "spark-cartridge: stop" >> $OPENSHIFT_SPARK_LOG
 
-  stopCluster
+    # TODO: move to TIDY
+  if [ -n "$OPENSHIFT_SPARK_CLUSTER_ID" ]
+  then
+    stopCluster
+  fi
 
-  # TODO: move to TIDY
+  if [ -n "$OPENSHIFT_SPARK_JOB_EXECUTION_ID" ]
+  then
+    deleteJobExecution
+  fi
 
-  deleteJobExecution
+  if [ -n "$OPENSHIFT_SPARK_JOB_ID" ]
+  then
+    deleteJob
+  fi
 
-  deleteJob
+  if [ -n "$OPENSHIFT_SPARK_JOB_BINARY_ID" ]
+  then
+    deleteJobBinary
+  fi
 
-  deleteJobBinary
-
-  deleteJobBinaryInternal
-
+  if [ -n "$OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID" ] 
+  then
+    deleteJobBinaryInternal
+  fi
 }
 
 function restart {
   stop
   start
   echo $(getLogTimeStamp) "spark-cartridge: restart" >> $OPENSHIFT_SPARK_LOG
-
 }
 
 function status {

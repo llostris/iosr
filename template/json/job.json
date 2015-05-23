@@ -1,5 +1,5 @@
 {
-	"name": "{NAME}-{TIMESTAMP}",
+	"name": "f9s-{NAME}-{TIMESTAMP}",
 	"type": "Spark",
 	"mains": ["{JOB_BINARY_ID}"]
 }

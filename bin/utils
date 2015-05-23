@@ -6,6 +6,23 @@ function getLogTimeStamp {
   echo "$(date +"%y-%m-%d %H:%M:%S") : "
 }
 
+
+function isAppWithManifest {
+  if [ -e "$OPENSHIFT_REPO_DIR/manifest.yml" ]
+  then
+    echo $(getLogTimeStamp) "Found manifest file in app directory" >> $OPENSHIFT_SPARK_LOG
+    echo 0
+  else
+    echo $(getLogTimeStamp) "Didn't found manifest file in app directory" >> $OPENSHIFT_SPARK_LOG
+    echo 1
+  fi
+}
+
+function cleanup {  
+  rm -rf "$OPENSHIFT_SPARK_DIR"/temp
+  mkdir "$OPENSHIFT_SPARK_DIR"/temp
+}
+
 # function isDeleteSuccessful(response id name) {
 
 # }
@@ -29,8 +46,7 @@ function authenticate {
 function createCluster {
   client_message "Creating Spark clusters on OpenStack..."
 
-  rm -rf "$OPENSHIFT_SPARK_DIR"/temp
-  mkdir "$OPENSHIFT_SPARK_DIR"/temp
+  cleanup
 
   timestamp="$(date +"%m%d%H%M%S")"
 
@@ -51,18 +67,23 @@ function createCluster {
       -d @"$OPENSHIFT_SPARK_DIR"/temp/launch_cluster_resolved.json \
       > "$OPENSHIFT_SPARK_DIR"/temp/response_launch_cluster.json
 
-  ERROR=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
+  ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
 
   # TODO: add error handling
 
-  OPENSHIFT_SPARK_CLUSTER_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.cluster.id'`
-  OPENSHIFT_SPARK_MANAGEMENT_KEY=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.cluster.management_public_key'`
+  if [ "$ERROR_MSG" == 'null' ]
+  then
+    OPENSHIFT_SPARK_CLUSTER_ID=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.cluster.id'`
+    OPENSHIFT_SPARK_MANAGEMENT_KEY=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.cluster.management_public_key'`
 
-  echo "Cluster id: $OPENSHIFT_SPARK_CLUSTER_ID" >> $OPENSHIFT_SPARK_LOG
-  client_message "Cluster id: $OPENSHIFT_SPARK_CLUSTER_ID"
+    echo $(getLogTimeStamp) "Cluster id: $OPENSHIFT_SPARK_CLUSTER_ID" >> $OPENSHIFT_SPARK_LOG
+    client_message "Cluster id: $OPENSHIFT_SPARK_CLUSTER_ID"
 
-  echo $OPENSHIFT_SPARK_CLUSTER_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_CLUSTER_ID
-  echo $OPENSHIFT_SPARK_MANAGEMENT_KEY > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_MANAGEMENT_KEY
+    echo $OPENSHIFT_SPARK_CLUSTER_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_CLUSTER_ID
+    echo $OPENSHIFT_SPARK_MANAGEMENT_KEY > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_MANAGEMENT_KEY
+  else
+    echo $(getLogTimeStamp) "Failed to start cluster. Error message: ${ERROR_MSG}" >> $OPENSHIFT_SPARK_LOG
+  fi
 }
 
 function stopCluster {
@@ -81,13 +102,33 @@ function stopCluster {
     echo $(getLogTimeStamp) "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully." >> OPENSHIFT_SPARK_LOG
     client_message "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully."
   else
-    echo $(getLogTimeStamp) "Error terminating ${OPENSHIFT_SPARK_CLUSTER_ID} cluster." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Error terminating ${OPENSHIFT_SPARK_CLUSTER_ID} cluster. " >> OPENSHIFT_SPARK_LOG
   fi
 }
 
 function checkClusterStatus {
-  # TODO
-  echo 0
+  OPENSTACK_TOKEN=$(authenticate)
+  client_message "checkClusterStatus: your token is: $OPENSTACK_TOKEN"
+
+  curl -s -X GET "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/clusters/${OPENSHIFT_SPARK_CLUSTER_ID}" \
+      -H "Content-Type: application/json" \
+      -H "X-Auth-Token: $TOKEN" > "$OPENSHIFT_REPO_DIR/temp/response_cluster_status.json"
+
+  ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_cluster_status.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
+
+  if [ "$ERROR_MSG" == 'null' ]
+  then
+    OPENSHIFT_SPARK_CLUSTER_STATUS=`cat $OPENSHIFT_SPARK_DIR/temp/response_cluster_status.json | $OPENSHIFT_SPARK_JQ -r '.cluster.status'`
+    echo $OPENSHIFT_SPARK_CLUSTER_STATUS > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_CLUSTER_STATUS
+
+    echo $(getLogTimeStamp) "Current status of cluster with id: ${OPENSHIFT_SPARK_CLUSTER_ID} is: ${OPENSHIFT_SPARK_CLUSTER_STATUS}" >> $OPENSHIFT_SPARK_LOG
+
+    echo $OPENSHIFT_SPARK_CLUSTER_STATUS
+  else
+    echo $(getLogTimeStamp) "Failed to obtain status information about cluster with id: ${OPENSHIFT_SPARK_CLUSTER_ID}. Error message: ${ERROR_MSG}" >> $OPENSHIFT_SPARK_LOG
+
+    echo "ERROR"
+  fi
 }
 
 # create job
@@ -97,10 +138,11 @@ function createJobBinaryInternal {
   OPENSTACK_TOKEN=$(authenticate)
   client_message "createJobBinaryInternal: your token is: $OPENSTACK_TOKEN"
 
+  timestamp="$(date +"%m%d%H%M%S")"
+  OPENSHIFT_SPARK_BINARY_NAME="f9s-${OPENSHIFT_APP_UUID}-${timestamp}"
+  
   # hardcoded for the time being
-  # OPENSHIFT_SPARK_BINARY_NAME="wordcount.scala"
   # OPENSHIFT_SPARK_BINARY_PATH="$OPENSHIFT_SPARK_DIR/template/wordcount.scala"
-  OPENSHIFT_SPARK_BINARY_NAME="SparkPi.jar"
   OPENSHIFT_SPARK_BINARY_PATH="$OPENSHIFT_SPARK_DIR/template/SparkPi.jar"
 
   curl -s -X PUT "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/job-binary-internals/$OPENSHIFT_SPARK_BINARY_NAME" \
@@ -160,7 +202,7 @@ function createJob {
 
   timestamp="$(date +"%Y%m%d%H%M%S")"
 
-  sed -e "s/{NAME}/$OPENSHIFT_APP_NAME/g" \
+  sed -e "s/{NAME}/${OPENSHIFT_APP_UUID}/g" \
     -e "s/{TIMESTAMP}/$timestamp/g" \
     -e "s/{JOB_BINARY_ID}/$OPENSHIFT_SPARK_JOB_BINARY_ID/g" \
     "$OPENSHIFT_SPARK_DIR"/template/json/job.json > "$OPENSHIFT_SPARK_DIR"/temp/job_resolved.json
