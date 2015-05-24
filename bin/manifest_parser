@@ -30,7 +30,7 @@ function parse_manifest {
   
   parse_yaml $OPENSHIFT_SPARK_DIR/temp/manifest.tmp.yml "SPARK_" > $OPENSHIFT_SPARK_DIR/manifest.properties
   echo "Parsed manifest: " >> $OPENSHIFT_SPARK_LOG
-  echo `cat $OPENSHIFT_SPARK_DIR/manifest.yml` >> $OPENSHIFT_SPARK_LOG
+  echo `cat $OPENSHIFT_SPARK_DIR/manifest.properties` >> $OPENSHIFT_SPARK_LOG
   
   rm $OPENSHIFT_SPARK_DIR/temp/manifest.tmp.yml
 }

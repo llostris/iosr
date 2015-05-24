@@ -1,8 +1,12 @@
 #!/bin/bash -eu
 
-client_message "Spark Cartridge: Teardown"
-# rm -rf $OPENSHIFT_SPARK_DIR/*
+source $OPENSHIFT_CARTRIDGE_SDK_BASH
 
-# delete clusters
+client_message "Spark Cartridge: Teardown"
+client_message "Stopping cluster, removing all cluster and job-related objects"
+
+$OPENSHIFT_SPARK_DIR/bin/control stop
+
+# rm -rf $OPENSHIFT_SPARK_DIR/*
 
 exit 0

@@ -18,6 +18,39 @@ function isAppWithManifest {
   fi
 }
 
+function loadDataFromManifest {
+  source $OPENSHIFT_SPARK_DIR/manifest.properties
+  source $OPENSHIFT_SPARK_DIR/template/config.properties
+
+  echo $(getLogTimeStamp) "Cluster size found in manifest: $SPARK_CLUSTER_SIZE" >> $OPENSHIFT_SPARK_LOG
+  SPARK_CLUSTER_TEMPLATE_ID_VAR="CLUSTER_TEMPLATE_ID_${SPARK_CLUSTER_SIZE^^}"
+  OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID=${!SPARK_CLUSTER_TEMPLATE_ID_VAR}
+
+  if [ -n $OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID ]
+  then
+    echo $OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID
+    echo $(getLogTimeStamp) "Cluster template id on OpenStack: ${OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID}" >> $OPENSHIFT_SPARK_LOG
+  else
+    echo $(getLogTimeStamp) "Cluster template id is empty. Cluster won't be created." >> $OPENSHIFT_SPARK_LOG
+    exit 1
+  fi
+
+  echo "Binary file path specified in manifest: $SPARK_JOB_BINARY_PATH" >> $OPENSHIFT_SPARK_LOG
+  OPENSHIFT_SPARK_BINARY_PATH="$OPENSHIFT_REPO_DIR$SPARK_JOB_BINARY_PATH"  # taken from manifest
+  echo "Resolved path: $OPENSHIFT_SPARK_BINARY_PATH" >> $OPENSHIFT_SPARK_LOG
+  echo $OPENSHIFT_SPARK_BINARY_PATH > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_BINARY_PATH
+
+  timestamp="$(date +"%m%d%H%M%S")"
+  EXTENSION=${SPARK_JOB_BINARY_PATH##*.}
+  OPENSHIFT_SPARK_BINARY_NAME="f9s-${OPENSHIFT_APP_UUID}-${timestamp}.$EXTENSION"
+  echo $OPENSHIFT_SPARK_BINARY_NAME > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_BINARY_NAME
+  echo "Binary internal name: $OPENSHIFT_SPARK_BINARY_NAME" >> $OPENSHIFT_SPARK_LOG
+
+  OPENSHIFT_SPARK_JOB_MAIN_CLASS=$SPARK_JOB_MAIN_CLASS
+  echo $OPENSHIFT_SPARK_JOB_MAIN_CLASS > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_JOB_MAIN_CLASS
+  echo "Main class specified in manifest: $SPARK_JOB_MAIN_CLASS" >> $OPENSHIFT_SPARK_LOG
+}
+
 function cleanup {  
   rm -rf "$OPENSHIFT_SPARK_DIR"/temp
   mkdir "$OPENSHIFT_SPARK_DIR"/temp
@@ -47,14 +80,14 @@ function createCluster {
   client_message "Creating Spark clusters on OpenStack..."
 
   cleanup
+  
+  # resolve cluster template id based on manifest
+  loadDataFromManifest
 
   timestamp="$(date +"%m%d%H%M%S")"
 
   TOKEN=$(authenticate)
   client_message "Your token is: $TOKEN"
-
-  # hardcoded for the time being
-  OPENSHIFT_SPARK_CLUSTER_TEMPLATE_ID="65c9d312-f0ed-4853-a268-0be956ce239e"  
 
   sed -e "s/{UUID}/$OPENSHIFT_APP_UUID/g" \
     -e "s/{TIMESTAMP}/$timestamp/g" \
@@ -68,8 +101,6 @@ function createCluster {
       > "$OPENSHIFT_SPARK_DIR"/temp/response_launch_cluster.json
 
   ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_launch_cluster.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
-
-  # TODO: add error handling
 
   if [ "$ERROR_MSG" == 'null' ]
   then
@@ -99,10 +130,10 @@ function stopCluster {
 
   if [ $RESPONSE_CODE -eq 204 ]
   then
-    echo $(getLogTimeStamp) "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully." >> $OPENSHIFT_SPARK_LOG
     client_message "Cluster with id ${OPENSHIFT_SPARK_CLUSTER_ID} stopped successfully."
   else
-    echo $(getLogTimeStamp) "Error terminating ${OPENSHIFT_SPARK_CLUSTER_ID} cluster. " >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Error terminating ${OPENSHIFT_SPARK_CLUSTER_ID} cluster. " >> $OPENSHIFT_SPARK_LOG
   fi
 }
 
@@ -138,16 +169,11 @@ function createJobBinaryInternal {
   OPENSTACK_TOKEN=$(authenticate)
   client_message "createJobBinaryInternal: your token is: $OPENSTACK_TOKEN"
 
-  timestamp="$(date +"%m%d%H%M%S")"
-  OPENSHIFT_SPARK_BINARY_NAME="f9s-${OPENSHIFT_APP_UUID}-${timestamp}"
+  echo "Creating binary with name: $OPENSHIFT_SPARK_BINARY_NAME from file $OPENSHIFT_SPARK_BINARY_PATH" >> $OPENSHIFT_SPARK_LOG
   
-  # hardcoded for the time being
-  # OPENSHIFT_SPARK_BINARY_PATH="$OPENSHIFT_SPARK_DIR/template/wordcount.scala"
-  OPENSHIFT_SPARK_BINARY_PATH="$OPENSHIFT_SPARK_DIR/template/SparkPi.jar"
-
   curl -s -X PUT "$OPENSTACK_SAHARA_URL/$OPENSTACK_TENANT_ID/job-binary-internals/$OPENSHIFT_SPARK_BINARY_NAME" \
     -H "X-Auth-Token: $OPENSTACK_TOKEN" \
-    -d @"$OPENSHIFT_SPARK_BINARY_PATH" \
+    --data-binary @"$OPENSHIFT_SPARK_BINARY_PATH" \
     > "$OPENSHIFT_SPARK_DIR"/temp/response_job_binary_internal.json
 
   ERROR_MSG=`cat $OPENSHIFT_SPARK_DIR/temp/response_job_binary_internal.json | $OPENSHIFT_SPARK_JQ -r '.error_message'`
@@ -233,10 +259,8 @@ function executeJob {
   OPENSTACK_TOKEN=$(authenticate)
   client_message "executeJob: your token is: $OPENSTACK_TOKEN"
 
-  MAIN_CLASS="org.apache.spark.examples.SparkPi"
-
   sed -e "s/{CLUSTER_ID}/$OPENSHIFT_SPARK_CLUSTER_ID/g" \
-    -e "s/{MAIN_CLASS}/$MAIN_CLASS/g" \
+    -e "s/{MAIN_CLASS}/$OPENSHIFT_SPARK_JOB_MAIN_CLASS/g" \
     "$OPENSHIFT_SPARK_DIR"/template/json/execute_job.json > "$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json
 
   curl -s -X POST "${OPENSTACK_SAHARA_URL}/${OPENSTACK_TENANT_ID}/jobs/${OPENSHIFT_SPARK_JOB_ID}/execute" \
@@ -255,7 +279,7 @@ function executeJob {
     echo $OPENSHIFT_SPARK_JOB_EXECUTION_ID > $OPENSHIFT_SPARK_DIR/env/OPENSHIFT_SPARK_JOB_EXECUTION_ID
     
     echo $(getLogTimeStamp) "Job execution id: ${OPENSHIFT_SPARK_JOB_EXECUTION_ID}" >> $OPENSHIFT_SPARK_LOG
-    echo $(getLogTimeStamp) "Job execution status is ${JOB_STATUS}" >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Job execution status is ${JOB_STATUS}" >> $OPENSHIFT_SPARK_LOG
     client_message "Started job execution with id=${OPENSHIFT_SPARK_JOB_EXECUTION_ID}. Current job status is ${JOB_STATUS}."
   else
     echo $(getLogTimeStamp) "Error occurred when executing job with id ${OPENSHIFT_SPARK_JOB_ID}: $ERROR_MSG" >> $OPENSHIFT_SPARK_LOG
@@ -278,10 +302,10 @@ function deleteJobBinaryInternal {
 
   if [ $RESPONSE_CODE -eq 204 ]
   then
-    echo $(getLogTimeStamp) "Job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} deleted successfully." >> $OPENSHIFT_SPARK_LOG
     client_message "Job binary internal with id: ${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID} deleted successfully."
   else
-    echo $(getLogTimeStamp) "Error deleting job binary internal with id: $${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID}." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Error deleting job binary internal with id: $${OPENSHIFT_SPARK_JOB_BINARY_INTERNAL_ID}." >> $OPENSHIFT_SPARK_LOG
   fi
 }
 
@@ -298,10 +322,10 @@ function deleteJobBinary {
 
   if [ $RESPONSE_CODE -eq 204 ]
   then
-    echo $(getLogTimeStamp) "Job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} deleted successfully." >> $OPENSHIFT_SPARK_LOG
     client_message "Job binary with id: ${OPENSHIFT_SPARK_JOB_BINARY_ID} deleted successfully."
   else
-    echo $(getLogTimeStamp) "Error deleting job binary with id: $${OPENSHIFT_SPARK_JOB_BINARY_ID}." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Error deleting job binary with id: $${OPENSHIFT_SPARK_JOB_BINARY_ID}." >> $OPENSHIFT_SPARK_LOG
   fi
 }
 
@@ -317,10 +341,10 @@ function deleteJob {
 
   if [ $RESPONSE_CODE -eq 204 ]
   then
-    echo $(getLogTimeStamp) "Job with id: ${OPENSHIFT_SPARK_JOB_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Job with id: ${OPENSHIFT_SPARK_JOB_ID} deleted successfully." >> $OPENSHIFT_SPARK_LOG
     client_message "Job with id: ${OPENSHIFT_SPARK_JOB_ID} deleted successfully."
   else
-    echo $(getLogTimeStamp) "Error deleting job with id: ${OPENSHIFT_SPARK_JOB_ID}." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Error deleting job with id: ${OPENSHIFT_SPARK_JOB_ID}." >> $OPENSHIFT_SPARK_LOG
   fi
 }
 
@@ -336,9 +360,9 @@ function deleteJobExecution {
 
   if [ $RESPONSE_CODE -eq 204 ]
   then
-    echo $(getLogTimeStamp) "Job execution with id: ${OPENSHIFT_SPARK_JOB_EXECUTION_ID} deleted successfully." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Job execution with id: ${OPENSHIFT_SPARK_JOB_EXECUTION_ID} deleted successfully." >> $OPENSHIFT_SPARK_LOG
     client_message "Job execution with id: ${OPENSHIFT_SPARK_JOB_EXECUTION_ID} deleted successfully."
   else
-    echo $(getLogTimeStamp) "Error deleting job execution with id: ${OPENSHIFT_SPARK_JOB_ID}." >> OPENSHIFT_SPARK_LOG
+    echo $(getLogTimeStamp) "Error deleting job execution with id: ${OPENSHIFT_SPARK_JOB_ID}." >> $OPENSHIFT_SPARK_LOG
   fi
 }
