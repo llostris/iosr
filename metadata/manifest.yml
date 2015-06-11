@@ -1,10 +1,10 @@
 Name: spark
 Cartridge-Short-Name: SPARK
-Cartridge-Version: 0.0.6
+Cartridge-Version: 0.0.7
 Cartridge-Vendor: aghiosr
 Source-Url: https://github.com/llostris/iosr/archive/cartridge.zip
 Display-Name: Spark Cartridge
-Description: "Empty cartridge"
+Description: "Cartridge for automatic provisioning of Spark"
 Version: '1.0.0'
 Vendor: 'Apache'
 Categories:

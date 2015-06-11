@@ -18,7 +18,7 @@ function parse_yaml {
 }
 
 function substitude_dashes {
-  awk -F= 'OFS=FS { gsub("-", "_", $1); }1' $1
+  awk -F: 'OFS=FS { gsub("-", "_", $1); }1' $1
 }
 
 function parse_manifest {
