@@ -25,10 +25,10 @@ from sahara.openstack.common import log as logging
 from sahara.plugins.general import exceptions as ex
 from sahara.plugins.general import utils
 from sahara.plugins import provisioning as p
-from sahara.plugins.spark import config_helper as c_helper
-from sahara.plugins.spark import edp_engine
-from sahara.plugins.spark import run_scripts as run
-from sahara.plugins.spark import scaling as sc
+from sahara.plugins.sparkf9s import config_helper as c_helper
+from sahara.plugins.sparkf9s import edp_engine
+from sahara.plugins.sparkf9s import run_scripts as run
+from sahara.plugins.sparkf9s import scaling as sc
 from sahara.topology import topology_helper as th
 from sahara.utils import files as f
 from sahara.utils import general as ug
