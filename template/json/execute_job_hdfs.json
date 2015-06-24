@@ -1,0 +1,12 @@
+{
+	"cluster_id": "{CLUSTER_ID}",
+	"job_configs": {
+		"configs": {
+			"edp.java.main_class": "{MAIN_CLASS}"
+		},
+		"args": [
+			"{INPUT_ID}",
+			"{OUTPUT_ID}"
+		]
+	}
+}

@@ -34,7 +34,7 @@ function start {
 function stop {
   echo $(getLogTimeStamp) "spark-cartridge: stop" >> $OPENSHIFT_SPARK_LOG
 
-    # TODO: move to TIDY
+  # TODO: move to TIDY
   if [ -n "$OPENSHIFT_SPARK_CLUSTER_ID" ]
   then
     stopCluster
@@ -62,9 +62,9 @@ function stop {
 }
 
 function restart {
+  echo $(getLogTimeStamp) "spark-cartridge: restart" >> $OPENSHIFT_SPARK_LOG
   stop
   start
-  echo $(getLogTimeStamp) "spark-cartridge: restart" >> $OPENSHIFT_SPARK_LOG
 }
 
 function status {
