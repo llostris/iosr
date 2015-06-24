@@ -23,6 +23,8 @@ from eventlet import timeout as e_timeout
 
 from sahara import context
 
+reload(sys)
+sys.setdefaultencoding("utf-8")
 
 LOG = logging.getLogger(__name__)
 
