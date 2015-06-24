@@ -104,26 +104,20 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
 
         # Start the name node
         with remote.get_remote(nn_instance) as r:
-            run.format_namenode(r)
-            run.start_processes(r, "namenode")
+            ##run.format_namenode(r)
+            ##run.start_processes(r, "namenode")
+            run.start_processes(r, "yarn")
 
         # start the data nodes
-        self._start_slave_datanode_processes(dn_instances)
+        ##self._start_slave_datanode_processes(dn_instances)
 
         LOG.info(_LI("Hadoop services in cluster %s have been started"),
                  cluster.name)
 
-        with remote.get_remote(nn_instance) as r:
-            r.execute_command("sudo -u hdfs hdfs dfs -mkdir -p /user/$USER/")
-            r.execute_command("sudo -u hdfs hdfs dfs -chown $USER "
-                              "/user/$USER/")
-
-        # start spark nodes
-        if sm_instance:
-            with remote.get_remote(sm_instance) as r:
-                run.start_spark_master(r, self._spark_home(cluster))
-                LOG.info(_LI("Spark service at '%s' has been started"),
-                         sm_instance.hostname())
+        ##with remote.get_remote(nn_instance) as r:
+        ##    r.execute_command("sudo -u hdfs hdfs dfs -mkdir -p /user/$USER/")
+        ##    r.execute_command("sudo -u hdfs hdfs dfs -chown $USER "
+        ##                      "/user/$USER/")
 
         LOG.info(_LI('Cluster %s has been started successfully'),
                  cluster.name)
@@ -221,9 +215,10 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
         }
 
         files_init = {
-            '/tmp/sahara-hadoop-init.sh': ng_extra['setup_script'],
+        ##    '/tmp/sahara-hadoop-init.sh': ng_extra['setup_script'],
             'id_rsa': cluster.management_private_key,
-            'authorized_keys': cluster.management_public_key
+            'authorized_keys': cluster.management_public_key,
+            'slaves': ng_extra['sp_slaves']
         }
 
         # pietro: This is required because the (secret) key is not stored in
@@ -244,23 +239,23 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
                         {"nn_path": nn_path, "dn_path": dn_path})
 
         with remote.get_remote(instance) as r:
-            r.execute_command(
-                'sudo chown -R $USER:$USER /etc/hadoop'
-            )
-            r.execute_command(
-                'sudo chown -R $USER:$USER %s' % sp_home
-            )
-            r.write_files_to(files_hadoop)
-            r.write_files_to(files_spark)
+            # r.execute_command(
+                # 'sudo chown -R $USER:$USER /etc/hadoop'
+            # )
+            # r.execute_command(
+                # 'sudo chown -R $USER:$USER %s' % sp_home
+            # )
+            # r.write_files_to(files_hadoop)
+            # r.write_files_to(files_spark)
             r.write_files_to(files_init)
-            r.execute_command(
-                'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
-            )
-            r.execute_command(
-                'sudo /tmp/sahara-hadoop-init.sh '
-                '>> /tmp/sahara-hadoop-init.log 2>&1')
+            # r.execute_command(
+                # 'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
+            # )
+            # r.execute_command(
+                # 'sudo /tmp/sahara-hadoop-init.sh '
+                # '>> /tmp/sahara-hadoop-init.log 2>&1')
 
-            r.execute_command(hdfs_dir_cmd)
+            # r.execute_command(hdfs_dir_cmd)
             r.execute_command(key_cmd)
 
             if c_helper.is_data_locality_enabled(cluster):
