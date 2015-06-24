@@ -54,13 +54,10 @@ function loadDataFromManifest {
       SPARK_OPENSTACK_TENANT_ID SPARK_OPENSTACK_TENANT_NAME \
       SPARK_NEUTRON_MANAGEMENT_NETWORK SPARK_INPUT_ID SPARK_OUTPUT_ID
   do
-    if [ -n "${!var}" ]
-    then
-      full_var_name=OPENSHIFT_${var}
-      export OPENSHIFT_${var}=${!var}
-      echo ${!full_var_name} > $OPENSHIFT_SPARK_DIR/env/${full_var_name}
-      echo "Setting up environmental variable ${full_var_name}: ${!full_var_name}" >> $OPENSHIFT_SPARK_LOG
-    fi
+    full_var_name=OPENSHIFT_${var}
+    export OPENSHIFT_${var}=${!var}
+    echo ${!full_var_name} > $OPENSHIFT_SPARK_DIR/env/${full_var_name}
+    echo "Setting up environmental variable ${full_var_name}: ${!full_var_name}" >> $OPENSHIFT_SPARK_LOG
   done
 }
 
@@ -98,9 +95,6 @@ function createCluster {
   client_message "Creating Spark clusters on OpenStack..."
 
   cleanup
-  
-  # resolve cluster template id based on manifest
-  loadDataFromManifest
 
   timestamp="$(date +"%m%d%H%M%S")"
 

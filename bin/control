@@ -16,9 +16,17 @@ function start {
     parse_manifest
 
     client_message "Parsed manifest file successfully."
+  
+    # resolve cluster template id based on manifest
+    loadDataFromManifest
 
-    createCluster
+    # if cluster doesn't exist already - create it
+    if [ -z "$OPENSHIFT_SPARK_CLUSTER_ID" ]
+    then
+      createCluster
+    fi
 
+    # if cluster was created successfully
     if [ -n "$OPENSHIFT_SPARK_CLUSTER_ID" ]
     then
       createJobBinaryInternal
@@ -35,11 +43,6 @@ function stop {
   echo $(getLogTimeStamp) "spark-cartridge: stop" >> $OPENSHIFT_SPARK_LOG
 
   # TODO: move to TIDY
-  if [ -n "$OPENSHIFT_SPARK_CLUSTER_ID" ]
-  then
-    stopCluster
-  fi
-
   if [ -n "$OPENSHIFT_SPARK_JOB_EXECUTION_ID" ]
   then
     deleteJobExecution
@@ -59,6 +62,11 @@ function stop {
   then
     deleteJobBinaryInternal
   fi
+
+  # if [ -n "$OPENSHIFT_SPARK_CLUSTER_ID" ]
+  # then
+  #   stopCluster
+  # fi
 }
 
 function restart {
