@@ -40,7 +40,7 @@ LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
 
 
-class SparkProvider(p.ProvisioningPluginBase):
+class SparkYARNProvider(p.ProvisioningPluginBase):
     def __init__(self):
         self.processes = {
             "HDFS": ["namenode", "datanode"],
@@ -48,11 +48,12 @@ class SparkProvider(p.ProvisioningPluginBase):
         }
 
     def get_title(self):
-        return "Apache Spark"
+        return "Apache Spark on YARN"
 
     def get_description(self):
         return _("This plugin provides an ability to launch Spark on Hadoop "
-                 "CDH cluster without any management consoles.")
+                 "CDH cluster without any management consoles. "
+                 "The Spark is initialized through YARN.")
 
     def get_versions(self):
         return ['1.0.0', '0.9.1']
