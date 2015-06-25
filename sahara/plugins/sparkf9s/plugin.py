@@ -237,7 +237,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
                         'sudo chown -R hdfs:hadoop %(nn_path)s %(dn_path)s &&'
                         'sudo chmod 755 %(nn_path)s %(dn_path)s' %
                         {"nn_path": nn_path, "dn_path": dn_path})
-
+		sp_slaves = utils.get_instances(cluster, "slave")
         with remote.get_remote(instance) as r:
             # r.execute_command(
                 # 'sudo chown -R $USER:$USER /etc/hadoop'
@@ -248,6 +248,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
             # r.write_files_to(files_hadoop)
             # r.write_files_to(files_spark)
             r.write_files_to(files_init)
+			
             # r.execute_command(
                 # 'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
             # )
@@ -257,6 +258,10 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
 
             # r.execute_command(hdfs_dir_cmd)
             r.execute_command(key_cmd)
+			if sp_slaves is not None:
+				slavenames = []
+				for slave in sp_slaves:
+					r.execute_command('.$HOME/node-setup.sh add ' + slave.hostname())
 
             if c_helper.is_data_locality_enabled(cluster):
                 r.write_file_to(
@@ -304,6 +309,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
             self._push_namenode_configs(cluster, r)
 
     def _push_namenode_configs(self, cluster, r):
+		
         r.write_file_to('/etc/hadoop/dn.incl',
                         utils.generate_fqdn_host_names(
                             utils.get_instances(cluster, "datanode")))
