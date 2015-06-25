@@ -1,0 +1,12 @@
+Cluster-Size: xs
+Job-Main-Class: "org.apache.spark.examples.WordCount"
+Job-Binary-Path: wordcount.jar
+Openstack-Url: http://172.17.84.1
+Openstack-Username: student
+Openstack-Password: student123
+Openstack-Tenant-Id: a23877e215ac496b8d4c06806cc30e00
+Openstack-Tenant-Name: student
+Neutron-Management-Network: "1f741b49-4e3e-43fa-900a-564c85d0c9c6"
+Input-Id: swift://container.sahara/input/pap.txt
+Output-Id: swift://container.sahara/output
+Swift-Enabled: true
