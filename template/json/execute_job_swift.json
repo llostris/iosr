@@ -1,0 +1,16 @@
+{
+    "cluster_id": "{CLUSTER_ID}",
+    "input_id": "{INPUT_ID}",
+    "output_id": "{OUTPUT_ID}",
+    "job_configs": {
+        "configs": {
+            "edp.java.main_class": "{MAIN_CLASS}",
+            "edp.spark.adapt_for_swift" : "true",
+            "fs.swift.service.sahara.username": "{USERNAME}",
+            "fs.swift.service.sahara.password": "{PASSWORD}",
+            "fs.swift.service.sahara.tenant": "{TENANT}",
+            "fs.swift.service.sahara.auth.url": "{AUTH_URL}",
+            "fs.swift.service.sahara.auth.endpoint.prefix": "{AUTH_ENDPOINTS}"
+        }
+    }
+}

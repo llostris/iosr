@@ -51,7 +51,7 @@ function loadDataFromManifest {
   echo "Main class specified in manifest: $SPARK_JOB_MAIN_CLASS" >> $OPENSHIFT_SPARK_LOG
 
   for var in SPARK_OPENSTACK_URL SPARK_OPENSTACK_USERNAME SPARK_OPENSTACK_PASSWORD \
-      SPARK_OPENSTACK_TENANT_ID SPARK_OPENSTACK_TENANT_NAME \
+      SPARK_OPENSTACK_TENANT_ID SPARK_OPENSTACK_TENANT_NAME SPARK_SWIFT_ENABLED \
       SPARK_NEUTRON_MANAGEMENT_NETWORK SPARK_INPUT_ID SPARK_OUTPUT_ID
   do
     full_var_name=OPENSHIFT_${var}
@@ -132,7 +132,7 @@ function createCluster {
 
 function stopCluster {
   OPENSTACK_TOKEN=$(authenticate)
-  client_message "STOP: your token is: $OPENSTACK_TOKEN"
+  client_message "stopCluster: your token is: $OPENSTACK_TOKEN"
   
   curl -s -X DELETE "$OPENSTACK_SAHARA_URL/clusters/${OPENSHIFT_SPARK_CLUSTER_ID}" \
     -H "Content-Type: application/json" \
@@ -269,19 +269,36 @@ function createJob {
 }
 
 function resolveProperJobExecution {
-  if [ -n "$OPENSHIFT_SPARK_INPUT_ID" ]
-  then
-    echo "Job with input and output data" >> $OPENSHIFT_SPARK_LOG
 
-    sed -e "s/{CLUSTER_ID}/$OPENSHIFT_SPARK_CLUSTER_ID/g" \
-      -e "s/{MAIN_CLASS}/$OPENSHIFT_SPARK_JOB_MAIN_CLASS/g" \
-      -e "s@{INPUT_ID}@$OPENSHIFT_SPARK_INPUT_ID@g" \
-      -e "s@{OUTPUT_ID}@$OPENSHIFT_SPARK_OUTPUT_ID@g" \
-      "$OPENSHIFT_SPARK_DIR"/template/json/execute_job_hdfs.json > "$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json
+  if [[ -n "$OPENSHIFT_SPARK_SWIFT_ENABLED" && "$OPENSHIFT_SPARK_SWIFT_ENABLED" = true ]]
+  then
+      echo "Job with Swift input and output data" >> $OPENSHIFT_SPARK_LOG
+
+      sed -e "s/{CLUSTER_ID}/$OPENSHIFT_SPARK_CLUSTER_ID/g" \
+        -e "s/{MAIN_CLASS}/$OPENSHIFT_SPARK_JOB_MAIN_CLASS/g" \
+        -e "s/{USERNAME}/$OPENSHIFT_SPARK_OPENSTACK_USERNAME/g" \
+        -e "s/{PASSWORD}/$OPENSHIFT_SPARK_OPENSTACK_PASSWORD/g" \
+        -e "s/{TENANT}/$OPENSHIFT_SPARK_OPENSTACK_TENANT_NAME/g" \
+        -e "s@{AUTH_URL}@$OPENSHIFT_SPARK_SWIFT_AUTH_URL@g" \
+        -e "s@{AUTH_ENDPOINTS}@$OPENSHIFT_SPARK_SWIFT_AUTH_ENDPOINTS@g" \
+        -e "s@{INPUT_ID}@$OPENSHIFT_SPARK_INPUT_ID@g" \
+        -e "s@{OUTPUT_ID}@$OPENSHIFT_SPARK_OUTPUT_ID@g" \
+        "$OPENSHIFT_SPARK_DIR"/template/json/execute_job_swift.json > "$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json
   else
-    sed -e "s/{CLUSTER_ID}/$OPENSHIFT_SPARK_CLUSTER_ID/g" \
-      -e "s/{MAIN_CLASS}/$OPENSHIFT_SPARK_JOB_MAIN_CLASS/g" \
-      "$OPENSHIFT_SPARK_DIR"/template/json/execute_job.json > "$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json
+    if [ -n "$OPENSHIFT_SPARK_INPUT_ID" ]
+    then
+      echo "Job with HDFS input and output data" >> $OPENSHIFT_SPARK_LOG
+
+      sed -e "s/{CLUSTER_ID}/$OPENSHIFT_SPARK_CLUSTER_ID/g" \
+        -e "s/{MAIN_CLASS}/$OPENSHIFT_SPARK_JOB_MAIN_CLASS/g" \
+        -e "s@{INPUT_ID}@$OPENSHIFT_SPARK_INPUT_ID@g" \
+        -e "s@{OUTPUT_ID}@$OPENSHIFT_SPARK_OUTPUT_ID@g" \
+        "$OPENSHIFT_SPARK_DIR"/template/json/execute_job_hdfs.json > "$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json
+    else
+      sed -e "s/{CLUSTER_ID}/$OPENSHIFT_SPARK_CLUSTER_ID/g" \
+        -e "s/{MAIN_CLASS}/$OPENSHIFT_SPARK_JOB_MAIN_CLASS/g" \
+        "$OPENSHIFT_SPARK_DIR"/template/json/execute_job.json > "$OPENSHIFT_SPARK_DIR"/temp/execute_job_resolved.json
+    fi
   fi
 }
 

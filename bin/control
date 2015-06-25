@@ -17,7 +17,7 @@ function start {
 
     client_message "Parsed manifest file successfully."
   
-    # resolve cluster template id based on manifest
+    # resolve cluster template id and other variables from manifest
     loadDataFromManifest
 
     # if cluster doesn't exist already - create it
