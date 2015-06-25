@@ -1,7 +1,5 @@
 {
     "cluster_id": "{CLUSTER_ID}",
-    "input_id": "{INPUT_ID}",
-    "output_id": "{OUTPUT_ID}",
     "job_configs": {
         "configs": {
             "edp.java.main_class": "{MAIN_CLASS}",
@@ -11,6 +9,10 @@
             "fs.swift.service.sahara.tenant": "{TENANT}",
             "fs.swift.service.sahara.auth.url": "{AUTH_URL}",
             "fs.swift.service.sahara.auth.endpoint.prefix": "{AUTH_ENDPOINTS}"
-        }
+        },
+        "args": [ 
+            "{INPUT_ID}", 
+            "{OUTPUT_ID}"
+        ]
     }
 }
