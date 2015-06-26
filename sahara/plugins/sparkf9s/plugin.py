@@ -113,16 +113,6 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
         LOG.info(_LI("Hadoop services in cluster %s have been started"),
                  cluster.name)
 
-        #with remote.get_remote(nn_instance) as r:
-            #r.execute_command(env+"hdfs dfs -mkdir -p /user/$USER/")
-            #r.execute_command(env+"hdfs dfs -chown $USER /user/$USER/")
-
-        # start spark nodes
-        #if sm_instance:
-            #with remote.get_remote(sm_instance) as r:
-                #run.start_spark_master(r, self._spark_home(cluster))
-                #LOG.info(_LI("Spark service at '%s' has been started"),
-                         #sm_instance.hostname())
 
         #LOG.info(_LI('Cluster %s has been started successfully'),
                  #cluster.name)
@@ -223,9 +213,10 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
         }
 
         files_init = {
-            '/tmp/sahara-hadoop-init.sh': ng_extra['setup_script'],
+        ##    '/tmp/sahara-hadoop-init.sh': ng_extra['setup_script'],
             'id_rsa': cluster.management_private_key,
-            'authorized_keys': cluster.management_public_key
+            'authorized_keys': cluster.management_public_key,
+            'slaves': ng_extra['sp_slaves']
         }
 
         # pietro: This is required because the (secret) key is not stored in
@@ -244,48 +235,31 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
                         'sudo chown -R ubuntu:ubuntu %(nn_path)s %(dn_path)s &&'
                         'sudo chmod 755 %(nn_path)s %(dn_path)s' %
                         {"nn_path": nn_path, "dn_path": dn_path})
-
+		sp_slaves = utils.get_instances(cluster, "slave")
         with remote.get_remote(instance) as r:
-            env = 'source ~/.env; '
-            r.execute_command(
-                'tail -n 17 ~/.bashrc > ~/.env &&'
-                'sudo chmod 666 /etc/environment && '
-                'echo ". /home/ubuntu/.env" >> /etc/environment'
-            )
-            r.execute_command(
-                'sudo mkdir -p /etc/hadoop/conf'
-            )
-            r.execute_command(
-                'sudo chown -R $USER:$USER /etc/hadoop'
-            )
-            r.execute_command(
-                'sudo chown -R $USER:$USER %s' % sp_home
-            )
-            r.write_files_to(files_hadoop)
-            r.write_files_to(files_spark)
+            # r.execute_command(
+                # 'sudo chown -R $USER:$USER /etc/hadoop'
+            # )
+            # r.execute_command(
+                # 'sudo chown -R $USER:$USER %s' % sp_home
+            # )
+            # r.write_files_to(files_hadoop)
+            # r.write_files_to(files_spark)
             r.write_files_to(files_init)
-            #r.execute_command(
-                #'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
-            #)
-            #r.execute_command(
-                #'sudo /tmp/sahara-hadoop-init.sh '
-                #'>> /tmp/sahara-hadoop-init.log 2>&1')
-            sp_master_raw = ng_extra['sp_master_raw']
-            r.execute_command(
-                env+'sudo cp '+os.path.join(sp_home, 'conf/slaves')+' $HADOOP_CONF_DIR/slaves'
-            )
-            r.execute_command(env+'./setup-node.sh setup-master %s' % sp_master_raw)
 
-            r.execute_command('echo "nameserver 8.8.8.8" > /tmp/resolv.conf && cat /etc/resolv.conf >> /tmp/resolv.conf && sudo mv /tmp/resolv.conf /etc/resolv.conf')
-            r.execute_command('wget http://sahara-files.mirantis.com/hadoop-swift/hadoop-swift-latest.jar')
-            r.execute_command(
-                'ln -s hadoop-swift-latest.jar /usr/local/hadoop/share/hadoop/tools/lib && '
-                'ln -s hadoop-swift-latest.jar /usr/local/hadoop/lib && '
-                'ln -s hadoop-swift-latest.jar /usr/local/hadoop/lib/native'
-            )
+            # r.execute_command(
+                # 'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
+            # )
+            # r.execute_command(
+                # 'sudo /tmp/sahara-hadoop-init.sh '
+                # '>> /tmp/sahara-hadoop-init.log 2>&1')
 
-            r.execute_command(hdfs_dir_cmd)
+            # r.execute_command(hdfs_dir_cmd)
             r.execute_command(key_cmd)
+			if sp_slaves is not None:
+				slavenames = []
+				for slave in sp_slaves:
+					r.execute_command('.$HOME/node-setup.sh add ' + slave.hostname())
 
             #if c_helper.is_data_locality_enabled(cluster):
                 #r.write_file_to(
@@ -333,6 +307,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
             self._push_namenode_configs(cluster, r)
 
     def _push_namenode_configs(self, cluster, r):
+
         r.write_file_to('/etc/hadoop/dn.incl',
                         utils.generate_fqdn_host_names(
                             utils.get_instances(cluster, "datanode")))

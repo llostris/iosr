@@ -27,6 +27,8 @@ def start_processes(remote, *processes):
             remote.execute_command("sudo service hadoop-hdfs-namenode start")
         elif proc == "datanode":
             remote.execute_command("sudo service hadoop-hdfs-datanode start")
+        elif proc == "yarn":
+            remote.execute_command("./node.sh start")
         else:
             remote.execute_command("screen -d -m sudo hadoop %s" % proc)
 
