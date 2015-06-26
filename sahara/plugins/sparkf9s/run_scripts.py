@@ -32,12 +32,12 @@ def start_processes(remote, *processes):
 
 
 def refresh_nodes(remote, service):
-    remote.execute_command("sudo -u hdfs hadoop %s -refreshNodes"
+    remote.execute_command("hadoop %s -refreshNodes"
                            % service)
 
 
 def format_namenode(nn_remote):
-    nn_remote.execute_command("sudo -u hdfs hadoop namenode -format")
+    nn_remote.execute_command("hadoop namenode -format")
 
 
 def clean_port_hadoop(nn_remote):

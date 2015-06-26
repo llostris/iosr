@@ -99,35 +99,34 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
 
     def start_cluster(self, cluster):
         nn_instance = utils.get_instance(cluster, "namenode")
-        sm_instance = utils.get_instance(cluster, "master")
-        dn_instances = utils.get_instances(cluster, "datanode")
+        #sm_instance = utils.get_instance(cluster, "master")
+        #dn_instances = utils.get_instances(cluster, "datanode")
+        env = 'source ~/.env; '
 
         # Start the name node
         with remote.get_remote(nn_instance) as r:
-            run.format_namenode(r)
-            run.start_processes(r, "namenode")
+            r.execute_command(env+'./node.sh start')
 
         # start the data nodes
-        self._start_slave_datanode_processes(dn_instances)
+        #self._start_slave_datanode_processes(dn_instances)
 
         LOG.info(_LI("Hadoop services in cluster %s have been started"),
                  cluster.name)
 
-        with remote.get_remote(nn_instance) as r:
-            r.execute_command("sudo -u hdfs hdfs dfs -mkdir -p /user/$USER/")
-            r.execute_command("sudo -u hdfs hdfs dfs -chown $USER "
-                              "/user/$USER/")
+        #with remote.get_remote(nn_instance) as r:
+            #r.execute_command(env+"hdfs dfs -mkdir -p /user/$USER/")
+            #r.execute_command(env+"hdfs dfs -chown $USER /user/$USER/")
 
         # start spark nodes
-        if sm_instance:
-            with remote.get_remote(sm_instance) as r:
-                run.start_spark_master(r, self._spark_home(cluster))
-                LOG.info(_LI("Spark service at '%s' has been started"),
-                         sm_instance.hostname())
+        #if sm_instance:
+            #with remote.get_remote(sm_instance) as r:
+                #run.start_spark_master(r, self._spark_home(cluster))
+                #LOG.info(_LI("Spark service at '%s' has been started"),
+                         #sm_instance.hostname())
 
-        LOG.info(_LI('Cluster %s has been started successfully'),
-                 cluster.name)
-        self._set_cluster_info(cluster)
+        #LOG.info(_LI('Cluster %s has been started successfully'),
+                 #cluster.name)
+        #self._set_cluster_info(cluster)
 
     def _spark_home(self, cluster):
         return c_helper.get_config_value("Spark", "Spark home", cluster)
@@ -142,6 +141,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
         config_master = config_slaves = ''
         if sp_master is not None:
             config_master = c_helper.generate_spark_env_configs(cluster)
+            config_master_raw = sp_master.hostname()
 
         if sp_slaves is not None:
             slavenames = []
@@ -164,6 +164,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
                         ng.configuration())
                 ),
                 'sp_master': config_master,
+                'sp_master_raw': config_master_raw,
                 'sp_slaves': config_slaves
             }
 
@@ -217,6 +218,7 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
         sp_home = self._spark_home(cluster)
         files_spark = {
             os.path.join(sp_home, 'conf/spark-env.sh'): ng_extra['sp_master'],
+            os.path.join(sp_home, 'conf/master'): ng_extra['sp_master_raw'],
             os.path.join(sp_home, 'conf/slaves'): ng_extra['sp_slaves']
         }
 
@@ -239,11 +241,20 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
                                                      '/dfs/nn'))
 
         hdfs_dir_cmd = ('sudo mkdir -p %(nn_path)s %(dn_path)s &&'
-                        'sudo chown -R hdfs:hadoop %(nn_path)s %(dn_path)s &&'
+                        'sudo chown -R ubuntu:ubuntu %(nn_path)s %(dn_path)s &&'
                         'sudo chmod 755 %(nn_path)s %(dn_path)s' %
                         {"nn_path": nn_path, "dn_path": dn_path})
 
         with remote.get_remote(instance) as r:
+            env = 'source ~/.env; '
+            r.execute_command(
+                'tail -n 17 ~/.bashrc > ~/.env &&'
+                'sudo chmod 666 /etc/environment && '
+                'echo ". /home/ubuntu/.env" >> /etc/environment'
+            )
+            r.execute_command(
+                'sudo mkdir -p /etc/hadoop/conf'
+            )
             r.execute_command(
                 'sudo chown -R $USER:$USER /etc/hadoop'
             )
@@ -253,27 +264,40 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
             r.write_files_to(files_hadoop)
             r.write_files_to(files_spark)
             r.write_files_to(files_init)
+            #r.execute_command(
+                #'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
+            #)
+            #r.execute_command(
+                #'sudo /tmp/sahara-hadoop-init.sh '
+                #'>> /tmp/sahara-hadoop-init.log 2>&1')
+            sp_master_raw = ng_extra['sp_master_raw']
             r.execute_command(
-                'sudo chmod 0500 /tmp/sahara-hadoop-init.sh'
+                env+'sudo cp '+os.path.join(sp_home, 'conf/slaves')+' $HADOOP_CONF_DIR/slaves'
             )
+            r.execute_command(env+'./setup-node.sh setup-master %s' % sp_master_raw)
+
+            r.execute_command('echo "nameserver 8.8.8.8" > /tmp/resolv.conf && cat /etc/resolv.conf >> /tmp/resolv.conf && sudo mv /tmp/resolv.conf /etc/resolv.conf')
+            r.execute_command('wget http://sahara-files.mirantis.com/hadoop-swift/hadoop-swift-latest.jar')
             r.execute_command(
-                'sudo /tmp/sahara-hadoop-init.sh '
-                '>> /tmp/sahara-hadoop-init.log 2>&1')
+                'ln -s hadoop-swift-latest.jar /usr/local/hadoop/share/hadoop/tools/lib && '
+                'ln -s hadoop-swift-latest.jar /usr/local/hadoop/lib && '
+                'ln -s hadoop-swift-latest.jar /usr/local/hadoop/lib/native'
+            )
 
             r.execute_command(hdfs_dir_cmd)
             r.execute_command(key_cmd)
 
-            if c_helper.is_data_locality_enabled(cluster):
-                r.write_file_to(
-                    '/etc/hadoop/topology.sh',
-                    f.get_file_text(
-                        'plugins/spark/resources/topology.sh'))
-                r.execute_command(
-                    'sudo chmod +x /etc/hadoop/topology.sh'
-                )
+            #if c_helper.is_data_locality_enabled(cluster):
+                #r.write_file_to(
+                    #'/etc/hadoop/topology.sh',
+                    #f.get_file_text(
+                        #'plugins/spark/resources/topology.sh'))
+                #r.execute_command(
+                    #'sudo chmod +x /etc/hadoop/topology.sh'
+                #)
 
-            self._write_topology_data(r, cluster, extra)
-            self._push_master_configs(r, cluster, extra, instance)
+            #self._write_topology_data(r, cluster, extra)
+            #self._push_master_configs(r, cluster, extra, instance)
 
     def _push_configs_to_existing_node(self, cluster, extra, instance):
         node_processes = instance.node_group.node_processes

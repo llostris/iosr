@@ -95,8 +95,8 @@ SPARK_CONFS = {
             {
                 'name': 'Spark home',
                 'description': 'The location of the spark installation'
-                ' (default: /opt/spark)',
-                'default': '/opt/spark',
+                ' (default: /usr/local/spark)',
+                'default': '/usr/local/spark',
                 'priority': 2,
             }
         ]
