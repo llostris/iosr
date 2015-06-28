@@ -96,7 +96,7 @@ function createCluster {
 
   cleanup
 
-  timestamp="$(date +"%m%d%H%M%S")"
+  timestamp="$(date +"%d%H%M")"
 
   TOKEN=$(authenticate)
   client_message "Your token is: $TOKEN"
