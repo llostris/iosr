@@ -101,10 +101,11 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
         nn_instance = utils.get_instance(cluster, "namenode")
         #sm_instance = utils.get_instance(cluster, "master")
         #dn_instances = utils.get_instances(cluster, "datanode")
-        env = 'source ~/.env; '
-
+        env = ' tail $HOME/.bashrc --lines 17 >> $HOME/env; source ~/env; '
+        hack_cmd = 'sed -i \'s/ssh /ssh -o StrictHostKeyChecking=no /g\' /usr/local/hadoop/sbin/slaves.sh'
         # Start the name node
         with remote.get_remote(nn_instance) as r:
+            r.execute_command(hack_cmd)
             r.execute_command(env+'./node.sh start')
 
         # start the data nodes
@@ -186,18 +187,24 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
 
     def _push_configs_to_nodes(self, cluster, extra, new_instances):
         all_instances = utils.get_instances(cluster)
+        sp_master = utils.get_instance(cluster, "master")
         with context.ThreadGroup() as tg:
             for instance in all_instances:
                 if instance in new_instances:
-                    tg.spawn('spark-configure-%s' % instance.instance_name,
-                             self._push_configs_to_new_node, cluster,
-                             extra, instance)
+                    if instance == sp_master:
+                        tg.spawn('spark-configure-%s' % instance.instance_name,
+                                 self._push_configs_to_new_node, cluster,
+                                 extra, instance, 1)
+                    else:
+                        tg.spawn('spark-configure-%s' % instance.instance_name,
+                                 self._push_configs_to_new_node, cluster,
+                                 extra, instance, 0)
                 else:
                     tg.spawn('spark-reconfigure-%s' % instance.instance_name,
                              self._push_configs_to_existing_node, cluster,
                              extra, instance)
 
-    def _push_configs_to_new_node(self, cluster, extra, instance):
+    def _push_configs_to_new_node(self, cluster, extra, instance, master):
         ng_extra = extra[instance.node_group.id]
 
         files_hadoop = {
@@ -235,7 +242,8 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
                         'sudo chown -R ubuntu:ubuntu %(nn_path)s %(dn_path)s &&'
                         'sudo chmod 755 %(nn_path)s %(dn_path)s' %
                         {"nn_path": nn_path, "dn_path": dn_path})
-		sp_slaves = utils.get_instances(cluster, "slave")
+        sp_slaves = utils.get_instances(cluster, "slave")
+        sm_instance = utils.get_instance(cluster, "master")
         with remote.get_remote(instance) as r:
             # r.execute_command(
                 # 'sudo chown -R $USER:$USER /etc/hadoop'
@@ -256,10 +264,14 @@ class SparkYARNProvider(p.ProvisioningPluginBase):
 
             # r.execute_command(hdfs_dir_cmd)
             r.execute_command(key_cmd)
-			if sp_slaves is not None:
-				slavenames = []
-				for slave in sp_slaves:
-					r.execute_command('.$HOME/node-setup.sh add ' + slave.hostname())
+            env = 'export HADOOP_CONF_DIR=/usr/local/hadoop/etc/hadoop; '
+            if master:
+                if sp_slaves is not None:
+                    slavenames = []
+                    for slave in sp_slaves:
+                        r.execute_command(env + '$HOME/setup-node.sh add-slave ' + slave.hostname())
+            else:
+                r.execute_command(env + '$HOME/setup-node.sh setup-master ' + sm_instance.hostname())
 
             #if c_helper.is_data_locality_enabled(cluster):
                 #r.write_file_to(

@@ -113,6 +113,7 @@ class SparkJobEngine(base_engine.JobEngine):
     def run_job(self, job_execution):
         ctx = context.ctx()
         job = conductor.job_get(ctx, job_execution.job_id)
+        env = ' tail $HOME/.bashrc --lines 17 >> $HOME/env; source ~/env; '
 
         proxy_configs = job_execution.job_configs.get('proxy_configs')
 
@@ -157,13 +158,19 @@ class SparkJobEngine(base_engine.JobEngine):
         args = " ".join(job_execution.job_configs.get('args', []))
 
         # The redirects of stdout and stderr will preserve output in the wf_dir
-        cmd = "%s %s --class %s %s --master spark://%s:%s %s" % (
+        #cmd = "%s %s --class %s %s --master spark://%s:%s %s" % (
+            #spark_submit,
+            #app_jar,
+            #job_class,
+            #additional_jars,
+            #host,
+            #port,
+            #args)
+        cmd = "%s --class %s --master yarn-cluster %s %s %s" % (
             spark_submit,
-            app_jar,
             job_class,
             additional_jars,
-            host,
-            port,
+            app_jar,
             args)
 
         # If an exception is raised here, the job_manager will mark
@@ -174,8 +181,8 @@ class SparkJobEngine(base_engine.JobEngine):
             r.write_file_to(launch, self._job_script())
             r.execute_command("chmod +x %s" % launch)
             ret, stdout = r.execute_command(
-                "cd %s; ./launch_command %s > /dev/null 2>&1 & echo $!"
-                % (wf_dir, cmd))
+                "%s cd %s; ./launch_command %s > /dev/null 2>&1 & echo $!"
+                % (env, wf_dir, cmd))
 
         if ret == 0:
             # Success, we'll add the wf_dir in job_execution.extra and store
