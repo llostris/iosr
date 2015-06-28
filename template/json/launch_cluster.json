@@ -1,6 +1,6 @@
 {
     "name": "f9s-{UUID}-{TIMESTAMP}",
-    "plugin_name": "spark",
+    "plugin_name": "sparkf9s",
     "hadoop_version": "1.0.0",
     "cluster_template_id" : "{CLUSTER_TEMPLATE_ID}",
     "user_keypair_id": "F9S",
