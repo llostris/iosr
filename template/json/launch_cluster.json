@@ -4,6 +4,6 @@
     "hadoop_version": "1.0.0",
     "cluster_template_id" : "{CLUSTER_TEMPLATE_ID}",
     "user_keypair_id": "F9S",
-    "default_image_id": "c113756d-05ec-4015-9054-2c1f1f29f182",
+    "default_image_id": "bbe519ca-29ee-4b64-a576-5e08422459e8",
     "neutron_management_network": "{OPENSTACK_NETWORK_ID}"
 }
