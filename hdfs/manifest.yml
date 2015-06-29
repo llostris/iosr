@@ -7,5 +7,5 @@ Openstack-Password: student123
 Openstack-Tenant-Id: a23877e215ac496b8d4c06806cc30e00
 Openstack-Tenant-Name: student
 Neutron-Management-Network: "1f741b49-4e3e-43fa-900a-564c85d0c9c6"
-Input-Id: hdfs://f9s-558cea5928cf8ffc9b0004bf-0626060044-f9s-master-001:8020/user/ubuntu/input/pap.txt
-Output-Id: hdfs://f9s-558cea5928cf8ffc9b0004bf-0626060044-f9s-master-001:8020/user/ubuntu/output2
+Input-Id: /user/ubuntu/input/pap.txt
+Output-Id: /user/ubuntu/output2
